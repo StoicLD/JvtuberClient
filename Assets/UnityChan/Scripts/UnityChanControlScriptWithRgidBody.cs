@@ -6,6 +6,7 @@ using System.Threading;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using JvutberNetwork;
 
 namespace UnityChan
 {
@@ -13,77 +14,102 @@ namespace UnityChan
 
     public class UnityChanControlScriptWithRgidBody : MonoBehaviour
     {
-
+        //全部是外部的指定参数
         public float eye_close, eye_open, mouth_close, mouth_open;
 
         private Animator anim;
 
-        private float roll=0, pitch=0, yaw=0, min_ear=1.0f, mar=0f, mdst=0.25f;
+        //private float roll=0, pitch=0, yaw=0, min_ear=1.0f, mar=0f, mdst=0.25f;
 
         // Thread
-        Thread receiveThread;
-        TcpClient client;
-        TcpListener listener;
-        int port = 5066;
+        //Thread receiveThread;
+        //TcpClient client;
+        //TcpListener listener;
+        //int port = 5066;
 
 
         public SkinnedMeshRenderer eye, eye_lid, mouth, eyebrow;
         private Transform neck;
         private Quaternion neck_quat;
 
-        // 初期化
+        //后续变量
+        public TcpHandler tcpHandler;
+
+        // 初始化
         void Start ()
         {
             Application.targetFrameRate = 30;
+            if(tcpHandler == null)
+            {
+                GameObject networkObject = GameObject.Find("NetWorkManager");
+                if(networkObject != null)
+                {
+                    tcpHandler = networkObject.GetComponent<TcpHandler>();
+                    if (tcpHandler == null)
+                    {
+                        Debug.Log("tcpHandler is null!");
+                        return;
+                    }
+                }
+            }
+
             anim = GetComponent<Animator> ();
 
             neck = anim.GetBoneTransform (HumanBodyBones.Neck);
             neck_quat = Quaternion.Euler(0, -90, -90);
 
-            InitTCP();
+            //InitTCP();
 
             // for (int index = 0; index < eyebrow.sharedMesh.blendShapeCount; index++){
             //     print(eyebrow.sharedMesh.GetBlendShapeName(index));
             // }
         }
 
-        private void InitTCP()
-        {
-            receiveThread = new Thread (new ThreadStart(ReceiveData));
-            receiveThread.IsBackground = true;
-            receiveThread.Start();
-        }
+        //private void InitTCP()
+        //{
+        //    //设置成background thread的好处是，一旦foreground thread全部停止了，background thread也会自动终止
+        //    receiveThread = new Thread(new ThreadStart(ReceiveData));
+        //    receiveThread.IsBackground = true;
+        //    receiveThread.Start();
+        //}
 
-        private void ReceiveData()
-        {
-            try {           
-                listener = new TcpListener(IPAddress.Parse("127.0.0.1"), port);
-                listener.Start();
-                Byte[] bytes = new Byte[1024];
-                while (true) {
-                    using (client = listener.AcceptTcpClient()) {
-                        using (NetworkStream stream = client.GetStream()) {
-                            int length;
-                            while ((length = stream.Read(bytes, 0, bytes.Length)) != 0) {
-                                var incommingData = new byte[length];
-                                Array.Copy(bytes, 0, incommingData, 0, length);
-                                string clientMessage = Encoding.ASCII.GetString(incommingData);
-                                string[] res = clientMessage.Split(' ');
-                                roll = float.Parse(res[0])*0.4f + roll*0.6f;
-                                pitch = float.Parse(res[1])*0.4f + pitch*0.6f;
-                                yaw = float.Parse(res[2])*0.4f + yaw*0.6f;
-                                min_ear = float.Parse(res[3]);
-                                mar = float.Parse(res[4])*0.4f + mar*0.6f;
-                                mdst = float.Parse(res[5]);
-                            }
-                        }
-                    }
-                }
-            } catch(Exception e) {
-                print (e.ToString());
-            }
-        }
-    
+        //private void ReceiveData()
+        //{
+        //    try
+        //    {
+        //        listener = new TcpListener(IPAddress.Parse("127.0.0.1"), port);
+        //        listener.Start();
+        //        Byte[] bytes = new Byte[1024];
+        //        while (true)
+        //        {
+        //            using (client = listener.AcceptTcpClient())
+        //            {
+        //                using (NetworkStream stream = client.GetStream())
+        //                {
+        //                    int length;
+        //                    while ((length = stream.Read(bytes, 0, bytes.Length)) != 0)
+        //                    {
+        //                        var incommingData = new byte[length];
+        //                        Array.Copy(bytes, 0, incommingData, 0, length);
+        //                        string clientMessage = Encoding.ASCII.GetString(incommingData);
+        //                        string[] res = clientMessage.Split(' ');
+        //                        roll = float.Parse(res[0]) * 0.4f + roll * 0.6f;
+        //                        pitch = float.Parse(res[1]) * 0.4f + pitch * 0.6f;
+        //                        yaw = float.Parse(res[2]) * 0.4f + yaw * 0.6f;
+        //                        min_ear = float.Parse(res[3]);
+        //                        mar = float.Parse(res[4]) * 0.4f + mar * 0.6f;
+        //                        mdst = float.Parse(res[5]);
+        //                    }
+        //                }
+        //            }
+        //        }
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        print(e.ToString());
+        //    }
+        //}
+
         void OnAnimatorIK (int layerIndex)
         {
             
@@ -93,21 +119,20 @@ namespace UnityChan
             // print(lookPos);
         }
 
-
         void Update() 
         {
 
             // set paramters
 
-            min_ear = Mathf.Clamp(min_ear, eye_close, eye_open);
-            float eyeratio = -100/(eye_open-eye_close)*(min_ear-eye_open);
-            
-            mar = Mathf.Clamp(mar, mouth_close, mouth_open);
-            float mouthratio = 100/(mouth_open-mouth_close)*(mar-mouth_close);
+            tcpHandler.min_ear = Mathf.Clamp(tcpHandler.min_ear, eye_close, eye_open);
+            float eyeratio = -100/(eye_open-eye_close)*(tcpHandler.min_ear - eye_open);
+
+            tcpHandler.mar = Mathf.Clamp(tcpHandler.mar, mouth_close, mouth_open);
+            float mouthratio = 100/(mouth_open-mouth_close)*(tcpHandler.mar - mouth_close);
             
             // do rotation, etc.
-            neck.rotation = Quaternion.Euler(-pitch, yaw, -roll) * neck_quat;
-            if (mdst > 0.33f){
+            neck.rotation = Quaternion.Euler(-tcpHandler.pitch, tcpHandler.yaw, -tcpHandler.roll) * neck_quat;
+            if (tcpHandler.mdst > 0.33f){
                 anim.SetLayerWeight(1, 1f);
                 anim.CrossFade ("smile1@unitychan", 0.1f);
             } else {
@@ -133,26 +158,26 @@ namespace UnityChan
             
         }
 
-        void OnApplicationQuit()
-        {
-            try
-            {
-                client.Close();
-            }
-            catch(Exception e)
-            {
-                Debug.Log(e.Message);
-            }
+        //void OnApplicationQuit()
+        //{
+        //    try
+        //    {
+        //        client.Close();
+        //    }
+        //    catch(Exception e)
+        //    {
+        //        Debug.Log(e.Message);
+        //    }
 
-            try
-            {
-                listener.Stop();
-            }
-            catch(Exception e)
-            {
-                Debug.Log(e.Message);
-            }
-        }
+        //    try
+        //    {
+        //        listener.Stop();
+        //    }
+        //    catch(Exception e)
+        //    {
+        //        Debug.Log(e.Message);
+        //    }
+        //}
     
         // 以下、メイン処理.リジッドボディと絡めるので、FixedUpdate内で処理を行う.
         // void FixedUpdate ()
